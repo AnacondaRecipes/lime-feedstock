@@ -10,9 +10,10 @@ source:
   sha256: 76960e4f055feb53e89b5022383bafc87b63f25bac6265984b0a333d1a57f781
 
 build:
-  skip: true  # [py<35]
+  number: 1
   script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
-  number: 0
+  # scikit-image <=0.21.0 is not avaliable for py312-313
+  skip: true  # [py<35 or py>312]
 
 requirements:
   host:
@@ -27,11 +28,17 @@ requirements:
     - scipy
     - tqdm
     - scikit-learn >=0.18
-    - scikit-image >=0.12
+    # Upper Bound added until random_seed→rng compatibility is not fixed.
+    - scikit-image >=0.12,<=0.21
+
+# The two first tests are deactivated because np.array_equal seems to have been used incorrectly in tests. It compares two nested lists
+# such as [[0, 8], [2], [4], [6]] and [[0, 8], [2], [4], [6]], which are equal but numpy fails to assert this. this is due to the [ 0, 8]
+# element of the list, which is of different length. np.array_equal is not used anywhere in the actual code. The third test fails randomly,
+# possibly because it uses random seed.
+{% set deselect_tests = " --deselect=test_lime_text.py::TestLimeText::test_indexed_string_callable" %}
+{% set deselect_tests = deselect_tests + " --deselect=test_lime_text.py::TestLimeText::test_indexed_string_regex" %}
 
 test:
-  source_files:
-    - lime/tests
   imports:
     - lime
   commands:
@@ -40,7 +47,7 @@ test:
     # such as [[0, 8], [2], [4], [6]] and [[0, 8], [2], [4], [6]], which are equal but numpy fails to assert this. this is due to the [ 0, 8] 
     # element of the list, which is of different length. np.array_equal is not used anywhere in the actual code. The third test fails randomly, 
     # possibly because it uses random seed.
-    - python -m pytest lime/tests -vv -k "not (test_indexed_string_callable or test_indexed_string_regex or test_lime_explainer_entropy_discretizer)"
+    - pytest --pyargs lime.tests {{ deselect_tests }}
   requires:
     - pip
     - pytest
@@ -57,7 +64,7 @@ about:
     classifiers or classifiers that act on tables (numpy arrays of numerical or 
     categorical data) or images, with a package called lime (short for local 
     interpretable model-agnostic explanations). 
-  doc_url: https://lime-ml.readthedocs.io/
+  doc_url: https://lime-ml.readthedocs.io
   dev_url: https://github.com/marcotcr/lime
 
 extra:
